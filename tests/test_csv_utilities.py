@@ -1,7 +1,7 @@
 import pytest
 
-from yt_audio_ripper.csv_utilities import read_requests
-from yt_audio_ripper.models import RequestRow
+from yt_mp3_extraction.csv_utilities import read_requests
+from yt_mp3_extraction.models import RequestRow
 
 HEADER = "filename,youtube_link\n"
 

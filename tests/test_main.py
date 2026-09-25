@@ -1,7 +1,7 @@
 import pytest
 
-from yt_audio_ripper import main as main_module
-from yt_audio_ripper.models import RequestRow
+from yt_mp3_extraction import main as main_module
+from yt_mp3_extraction.models import RequestRow
 
 HEADER = "filename,youtube_link\n"
 

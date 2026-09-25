@@ -1,6 +1,6 @@
 import pytest
 
-from yt_audio_ripper.naming import MAX_STEM_BYTES, sanitize_filename
+from yt_mp3_extraction.naming import MAX_STEM_BYTES, sanitize_filename
 
 
 @pytest.mark.parametrize("raw, expected", [
