@@ -2,7 +2,7 @@ import subprocess
 
 import pytest
 
-from yt_audio_ripper import check_ffmpeg, check_ytdlp
+from yt_mp3_extraction import check_ffmpeg, check_ytdlp
 
 
 class TestHasFfmpeg:

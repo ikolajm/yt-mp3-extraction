@@ -2,9 +2,9 @@ import subprocess
 
 import pytest
 
-from yt_audio_ripper import extraction
-from yt_audio_ripper.config import AUDIO_FORMAT
-from yt_audio_ripper.models import RequestRow
+from yt_mp3_extraction import extraction
+from yt_mp3_extraction.config import AUDIO_FORMAT
+from yt_mp3_extraction.models import RequestRow
 
 ROW = RequestRow("Some Song", "https://youtube.com/watch?v=abc")
 
