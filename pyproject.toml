@@ -12,7 +12,7 @@ dependencies = []
 dev = ["pytest"]
 
 [project.scripts]
-yt-mp3-extraction = "yt_mp3_extraction.main:main"
+ytx = "yt_mp3_extraction.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
