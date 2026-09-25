@@ -7,13 +7,13 @@ from yt_mp3_extraction.config import AUDIO_FORMAT
 from yt_mp3_extraction.models import RequestRow
 
 ROW = RequestRow("Some Song", "https://youtube.com/watch?v=abc")
+TIMEOUT = 7
 
 
 class TestExtractMp3:
 
     @pytest.fixture
-    def output_dir(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(extraction, "SCRIPT_OUTPUT_DIR", tmp_path)
+    def output_dir(self, tmp_path):
         return tmp_path
 
     @pytest.fixture
@@ -30,7 +30,7 @@ class TestExtractMp3:
         return recorded
 
     def test_builds_the_expected_command(self, captured, output_dir):
-        assert extraction.extract_mp3(ROW) is True
+        assert extraction.extract_mp3(ROW, output_dir, TIMEOUT) is True
 
         command = captured["command"]
         assert command[0] == "yt-dlp"
@@ -45,13 +45,13 @@ class TestExtractMp3:
         assert command[-2:] == ["--", ROW.youtube_link]   # `--` guards a leading dash
 
     def test_passes_the_configured_timeout(self, captured, output_dir):
-        extraction.extract_mp3(ROW)
+        extraction.extract_mp3(ROW, output_dir, TIMEOUT)
 
-        assert captured["kwargs"]["timeout"] == extraction.DOWNLOAD_TIMEOUT_SECONDS
+        assert captured["kwargs"]["timeout"] == TIMEOUT
         assert captured["kwargs"]["check"] is True
 
     def test_sanitizes_the_name_before_it_reaches_the_command(self, captured, output_dir):
-        extraction.extract_mp3(RequestRow("../../escape attempt", "https://a"))
+        extraction.extract_mp3(RequestRow("../../escape attempt", "https://a"), output_dir, TIMEOUT)
 
         output = captured["command"][captured["command"].index("-o") + 1]
         assert "escape_attempt" in output
@@ -60,12 +60,12 @@ class TestExtractMp3:
     def test_skips_a_file_that_already_exists(self, capsys, captured, output_dir):
         (output_dir / f"Some_Song.{AUDIO_FORMAT}").touch()
 
-        assert extraction.extract_mp3(ROW) is True
+        assert extraction.extract_mp3(ROW, output_dir, TIMEOUT) is True
         assert "already exists" in capsys.readouterr().out
         assert "command" not in captured
 
     def test_rejects_a_name_with_nothing_usable_in_it(self, capsys, captured, output_dir):
-        assert extraction.extract_mp3(RequestRow("...", "https://a")) is False
+        assert extraction.extract_mp3(RequestRow("...", "https://a"), output_dir, TIMEOUT) is False
         assert "no usable filename" in capsys.readouterr().err
         assert "command" not in captured
 
@@ -82,5 +82,5 @@ class TestExtractMp3:
 
         monkeypatch.setattr(extraction.subprocess, "run", fake_run)
 
-        assert extraction.extract_mp3(ROW) is False
+        assert extraction.extract_mp3(ROW, output_dir, TIMEOUT) is False
         assert expected_fragment in capsys.readouterr().err

@@ -1,13 +1,14 @@
+from pathlib import Path
 import subprocess
 import sys
 
 from .naming import sanitize_filename
-from .config import AUDIO_FORMAT, DOWNLOAD_TIMEOUT_SECONDS, SCRIPT_OUTPUT_DIR
+from .config import AUDIO_FORMAT
 from .models import RequestRow
 
 
-def extract_mp3(row: RequestRow) -> bool:
-    """Download one request's audio into SCRIPT_OUTPUT_DIR.
+def extract_mp3(row: RequestRow, out_dir: Path, timeout: int) -> bool:
+    """Download one request's audio into out_dir.
 
     Returns True on success or if the file is already present, False if the
     name is unusable or yt-dlp failed.
@@ -17,14 +18,14 @@ def extract_mp3(row: RequestRow) -> bool:
         print(f"Skipping {row.filename!r}: no usable filename characters.", file=sys.stderr)
         return False
 
-    final_path = SCRIPT_OUTPUT_DIR / f"{file_stem}.{AUDIO_FORMAT}"
+    final_path = out_dir / f"{file_stem}.{AUDIO_FORMAT}"
     if final_path.exists():
         print(f"Skipping {row.filename!r}: {final_path.name} already exists.")
         return True
 
     # yt-dlp fills in %(ext)s itself; the extension changes between download
     # and audio extraction.
-    output_template = SCRIPT_OUTPUT_DIR / f"{file_stem}.%(ext)s"
+    output_template = out_dir / f"{file_stem}.%(ext)s"
     command = [
         "yt-dlp",
         "-x",
@@ -35,7 +36,7 @@ def extract_mp3(row: RequestRow) -> bool:
     ]
 
     try:
-        subprocess.run(command, check=True, timeout=DOWNLOAD_TIMEOUT_SECONDS)
+        subprocess.run(command, check=True, timeout=timeout)
         print(f"Download complete: {final_path.name}")
         return True
     except subprocess.TimeoutExpired as err:
