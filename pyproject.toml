@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "yt-mp3-extraction"
 version = "0.1.0"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["mypy", "pytest", "ruff"]
 
 [project.scripts]
 ytx = "yt_mp3_extraction.main:main"
@@ -19,3 +19,10 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]

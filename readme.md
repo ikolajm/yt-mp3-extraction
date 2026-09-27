@@ -6,7 +6,7 @@ than what the uploader called them.
 
 ## Requirements
 
-- Python 3.10 or newer
+- Python 3.12 or newer
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.org)
   on PATH
 
@@ -66,6 +66,9 @@ force a refetch.
 
 ```
 pytest
+mypy
+ruff check
+ruff format --check
 ```
 
 `subprocess.run` is faked, so the suite covers manifest parsing, the filename

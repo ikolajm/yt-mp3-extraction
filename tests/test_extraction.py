@@ -1,4 +1,6 @@
 import subprocess
+from pathlib import Path
+from typing import Any, NoReturn
 
 import pytest
 
@@ -11,25 +13,28 @@ TIMEOUT = 7
 
 
 class TestExtractMp3:
-
     @pytest.fixture
-    def output_dir(self, tmp_path):
+    def output_dir(self, tmp_path: Path) -> Path:
         return tmp_path
 
     @pytest.fixture
-    def captured(self, monkeypatch):
+    def captured(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         """Record the subprocess call. Stays empty if nothing shells out."""
-        recorded = {}
+        recorded: dict[str, Any] = {}
 
-        def fake_run(command, **kwargs):
+        def fake_run(
+            command: list[str], **kwargs: Any
+        ) -> subprocess.CompletedProcess[str]:
             recorded["command"] = command
             recorded["kwargs"] = kwargs
             return subprocess.CompletedProcess(command, returncode=0)
 
-        monkeypatch.setattr(extraction.subprocess, "run", fake_run)
+        monkeypatch.setattr(subprocess, "run", fake_run)
         return recorded
 
-    def test_builds_the_expected_command(self, captured, output_dir):
+    def test_builds_the_expected_command(
+        self, captured: dict[str, Any], output_dir: Path
+    ) -> None:
         assert extraction.extract_mp3(ROW, output_dir, TIMEOUT) is True
 
         command = captured["command"]
@@ -39,48 +44,79 @@ class TestExtractMp3:
 
         output = command[command.index("-o") + 1]
         assert isinstance(output, str)
-        assert output.endswith(".%(ext)s")          # yt-dlp expands this itself
+        assert output.endswith(".%(ext)s")  # yt-dlp expands this itself
         assert str(output_dir) in output
 
-        assert command[-2:] == ["--", ROW.youtube_link]   # `--` guards a leading dash
+        assert command[-2:] == ["--", ROW.youtube_link]  # `--` guards a leading dash
 
-    def test_passes_the_configured_timeout(self, captured, output_dir):
+    def test_passes_the_configured_timeout(
+        self, captured: dict[str, Any], output_dir: Path
+    ) -> None:
         extraction.extract_mp3(ROW, output_dir, TIMEOUT)
 
         assert captured["kwargs"]["timeout"] == TIMEOUT
         assert captured["kwargs"]["check"] is True
 
-    def test_sanitizes_the_name_before_it_reaches_the_command(self, captured, output_dir):
-        extraction.extract_mp3(RequestRow("../../escape attempt", "https://a"), output_dir, TIMEOUT)
+    def test_sanitizes_the_name_before_it_reaches_the_command(
+        self, captured: dict[str, Any], output_dir: Path
+    ) -> None:
+        extraction.extract_mp3(
+            RequestRow("../../escape attempt", "https://a"), output_dir, TIMEOUT
+        )
 
         output = captured["command"][captured["command"].index("-o") + 1]
         assert "escape_attempt" in output
         assert ".." not in output
 
-    def test_skips_a_file_that_already_exists(self, capsys, captured, output_dir):
+    def test_skips_a_file_that_already_exists(
+        self,
+        capsys: pytest.CaptureFixture[str],
+        captured: dict[str, Any],
+        output_dir: Path,
+    ) -> None:
         (output_dir / f"Some_Song.{AUDIO_FORMAT}").touch()
 
         assert extraction.extract_mp3(ROW, output_dir, TIMEOUT) is True
         assert "already exists" in capsys.readouterr().out
         assert "command" not in captured
 
-    def test_rejects_a_name_with_nothing_usable_in_it(self, capsys, captured, output_dir):
-        assert extraction.extract_mp3(RequestRow("...", "https://a"), output_dir, TIMEOUT) is False
+    def test_rejects_a_name_with_nothing_usable_in_it(
+        self,
+        capsys: pytest.CaptureFixture[str],
+        captured: dict[str, Any],
+        output_dir: Path,
+    ) -> None:
+        assert (
+            extraction.extract_mp3(RequestRow("...", "https://a"), output_dir, TIMEOUT)
+            is False
+        )
         assert "no usable filename" in capsys.readouterr().err
         assert "command" not in captured
 
-    @pytest.mark.parametrize("error, expected_fragment", [
-        (subprocess.CalledProcessError(3, "yt-dlp"),        "error code 3"),
-        (subprocess.TimeoutExpired("yt-dlp", 180),          "Timed out"),
-        (FileNotFoundError(2, "No such file or directory"), "Error running extraction"),
-    ], ids=["yt-dlp-exited-nonzero", "yt-dlp-hung", "yt-dlp-vanished"])
+    @pytest.mark.parametrize(
+        "error, expected_fragment",
+        [
+            (subprocess.CalledProcessError(3, "yt-dlp"), "error code 3"),
+            (subprocess.TimeoutExpired("yt-dlp", 180), "Timed out"),
+            (
+                FileNotFoundError(2, "No such file or directory"),
+                "Error running extraction",
+            ),
+        ],
+        ids=["yt-dlp-exited-nonzero", "yt-dlp-hung", "yt-dlp-vanished"],
+    )
     def test_reports_a_failure_without_crashing(
-        self, capsys, monkeypatch, output_dir, error, expected_fragment
-    ):
-        def fake_run(command, **kwargs):
+        self,
+        capsys: pytest.CaptureFixture[str],
+        monkeypatch: pytest.MonkeyPatch,
+        output_dir: Path,
+        error: Exception,
+        expected_fragment: str,
+    ) -> None:
+        def fake_run(command: list[str], **kwargs: Any) -> NoReturn:
             raise error
 
-        monkeypatch.setattr(extraction.subprocess, "run", fake_run)
+        monkeypatch.setattr(subprocess, "run", fake_run)
 
         assert extraction.extract_mp3(ROW, output_dir, TIMEOUT) is False
         assert expected_fragment in capsys.readouterr().err

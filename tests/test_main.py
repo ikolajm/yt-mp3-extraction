@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -9,9 +10,8 @@ HEADER = "filename,youtube_link\n"
 
 
 class TestMain:
-
     @pytest.fixture
-    def wired(self, monkeypatch, tmp_path):
+    def wired(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, Any]:
         """Sandbox main(): deps present, paths in tmp_path, no downloads.
 
         The fake fails any row named FAIL*.
@@ -19,7 +19,7 @@ class TestMain:
         csv_path = tmp_path / "requests.csv"
         output_dir = tmp_path / "out"
         downloaded = []
-        seen = {}
+        seen: dict[str, Any] = {}
         timeout = 7
 
         def fake_extract(row: RequestRow, out_dir: Path, timeout: int) -> bool:
@@ -35,18 +35,21 @@ class TestMain:
         return {
             "argv": [
                 "track",
-                "--from-file", str(csv_path),
-                "--out", str(output_dir),
-                "--timeout", str(timeout)
+                "--from-file",
+                str(csv_path),
+                "--out",
+                str(output_dir),
+                "--timeout",
+                str(timeout),
             ],
             "csv": csv_path,
             "output_dir": output_dir,
             "downloaded": downloaded,
             "seen": seen,
-            "timeout": timeout
+            "timeout": timeout,
         }
 
-    def test_happy_path_exits_0(self, wired):
+    def test_happy_path_exits_0(self, wired: dict[str, Any]) -> None:
         wired["csv"].write_text(HEADER + "Song One,https://a\nSong Two,https://b\n")
 
         assert main_module.main(wired["argv"]) == 0
@@ -55,13 +58,17 @@ class TestMain:
         assert wired["seen"]["timeout"] == wired["timeout"]
         assert wired["output_dir"].is_dir()
 
-    def test_any_failure_exits_1(self, capsys, wired):
+    def test_any_failure_exits_1(
+        self, capsys: pytest.CaptureFixture[str], wired: dict[str, Any]
+    ) -> None:
         wired["csv"].write_text(HEADER + "OK,https://a\nFAIL Two,https://b\n")
 
         assert main_module.main(wired["argv"]) == 1
         assert "1/2 downloaded" in capsys.readouterr().out
 
-    def test_bad_csv_does_not_create_the_output_dir(self, wired):
+    def test_bad_csv_does_not_create_the_output_dir(
+        self, wired: dict[str, Any]
+    ) -> None:
         """Ordering: validate before creating anything on disk."""
         wired["csv"].write_text("wrong_header\nA\n")
 
@@ -70,19 +77,19 @@ class TestMain:
 
     @pytest.mark.parametrize("missing_dep", ["has_ytdlp", "has_ffmpeg"])
     def test_missing_dependency_exits_1_before_reading_anything(
-        self, monkeypatch, wired, missing_dep
-    ):
+        self, monkeypatch: pytest.MonkeyPatch, wired: dict[str, Any], missing_dep: str
+    ) -> None:
         monkeypatch.setattr(main_module, missing_dep, lambda: False)
 
         assert main_module.main(wired["argv"]) == 1
         assert wired["downloaded"] == []
 
-    def test_no_subcommand_exits_2(self):
+    def test_no_subcommand_exits_2(self) -> None:
         with pytest.raises(SystemExit) as exc:
             main_module.main([])
         assert exc.value.code == 2
 
-    def test_help_exits_0(self, capsys):
+    def test_help_exits_0(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(SystemExit) as exc:
             main_module.main(["--help"])
         assert exc.value.code == 0
