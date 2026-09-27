@@ -1,10 +1,10 @@
 import argparse
-from pathlib import Path
 import sys
+from collections.abc import Callable
+from pathlib import Path
 
 from .check_ffmpeg import has_ffmpeg
 from .check_ytdlp import has_ytdlp
-
 from .csv_utilities import read_requests
 from .extraction import extract_mp3
 
@@ -40,14 +40,12 @@ def run_track(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="ytx",
-        description="Download YouTube audio as MP3s."
+        prog="ytx", description="Download YouTube audio as MP3s."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     track_parser = subparsers.add_parser(
-        "track",
-        help="download each request as a single track"
+        "track", help="download each request as a single track"
     )
     track_parser.set_defaults(func=run_track)
 
@@ -74,8 +72,8 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     try:
-        return args.func(args)
+        func: Callable[[argparse.Namespace], int] = args.func
+        return func(args)
     except KeyboardInterrupt:
         print("\nInterrupted.", file=sys.stderr)
         sys.exit(130)
-

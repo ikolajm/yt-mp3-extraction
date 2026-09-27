@@ -12,8 +12,10 @@ def read_requests(csv_path: Path) -> list[RequestRow] | None:
     Returns None — having already explained why on stderr — if the file cannot
     be opened, the header does not match, or no usable rows are left.
     """
+    # open() stays outside the with so a failure to open is reported apart
+    # from one while reading; the with below closes the file either way.
     try:
-        csv_file = open(csv_path, newline="", encoding="utf-8-sig")
+        csv_file = open(csv_path, newline="", encoding="utf-8-sig")  # noqa: SIM115
     except FileNotFoundError:
         print(f"`{csv_path}` does not exist. Create it to proceed.", file=sys.stderr)
         return None
@@ -36,7 +38,9 @@ def read_requests(csv_path: Path) -> list[RequestRow] | None:
             if missing:
                 print(f"    Missing: {', '.join(sorted(missing))}", file=sys.stderr)
             if unexpected:
-                print(f"    Unexpected: {', '.join(sorted(unexpected))}", file=sys.stderr)
+                print(
+                    f"    Unexpected: {', '.join(sorted(unexpected))}", file=sys.stderr
+                )
             return None
 
         for row in csv_reader:
@@ -46,16 +50,20 @@ def read_requests(csv_path: Path) -> list[RequestRow] | None:
 
             if not filename or not youtube_link:
                 invalid_count += 1
-                print(f"Skipping row {csv_reader.line_num}: missing filename or link.",
-                      file=sys.stderr)
+                print(
+                    f"Skipping row {csv_reader.line_num}: missing filename or link.",
+                    file=sys.stderr,
+                )
                 continue
 
             rows.append(RequestRow(filename, youtube_link))
 
     if not rows:
         if invalid_count:
-            print(f"No usable rows in `{csv_path}` ({invalid_count} invalid).",
-                  file=sys.stderr)
+            print(
+                f"No usable rows in `{csv_path}` ({invalid_count} invalid).",
+                file=sys.stderr,
+            )
         else:
             print(f"No requests found in `{csv_path}`.", file=sys.stderr)
         return None
