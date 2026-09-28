@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "yt-mp3-extraction"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["yt-dlp[default, deno]"]
 
 [project.optional-dependencies]
 dev = ["mypy", "pytest", "ruff"]
@@ -26,3 +26,7 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 [tool.mypy]
 strict = true
 files = ["src", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["yt_dlp", "yt_dlp.*"]
+ignore_missing_imports = true

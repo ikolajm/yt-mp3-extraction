@@ -4,15 +4,11 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .check_ffmpeg import has_ffmpeg
-from .check_ytdlp import has_ytdlp
 from .csv_utilities import read_requests
 from .extraction import extract_mp3
 
 
 def run_track(args: argparse.Namespace) -> int:
-    if not has_ytdlp():
-        return 1
-
     if not has_ffmpeg():
         return 1
 
@@ -28,7 +24,7 @@ def run_track(args: argparse.Namespace) -> int:
 
     failures = 0
     for row in rows:
-        if not extract_mp3(row, args.out, args.timeout):
+        if not extract_mp3(row, args.out):
             failures += 1
 
     print(f"Extraction complete: {len(rows) - failures}/{len(rows)} downloaded.")
@@ -61,13 +57,6 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=Path.home() / "script-output",
         help="directory the mp3s are written to (default: ~/script-output)",
-    )
-
-    track_parser.add_argument(
-        "--timeout",
-        type=int,
-        default=180,
-        help="allowed seconds until process timeout",
     )
 
     args = parser.parse_args(argv)

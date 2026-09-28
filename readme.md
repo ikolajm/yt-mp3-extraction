@@ -7,11 +7,12 @@ than what the uploader called them.
 ## Requirements
 
 - Python 3.12 or newer
-- [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.org)
-  on PATH
+- [ffmpeg](https://ffmpeg.org) on PATH
 
-Those two are executables, not pip packages. Both are checked at startup, and a
-missing one exits before anything downloads.
+ffmpeg is an executable, not a pip package. It is checked at startup, and if it
+is missing the run exits before anything downloads.
+[yt-dlp](https://github.com/yt-dlp/yt-dlp) is a package dependency and installs
+with this one, along with deno, the JavaScript runtime it uses for YouTube.
 
 ## Install
 
@@ -55,8 +56,7 @@ status is non-zero if any row failed.
 ## Output
 
 Files are written to `~/script-output/`, or to `--out DIR`, created if it does
-not exist. Each download is abandoned after 180 seconds; `--timeout SECONDS`
-changes that.
+not exist.
 
 A link whose output file is already there is skipped without a network call, so
 rerunning after a partial failure only fetches what is missing. Delete a file to
@@ -71,5 +71,6 @@ ruff check
 ruff format --check
 ```
 
-`subprocess.run` is faked, so the suite covers manifest parsing, the filename
+The download is faked: most tests replace `download_mp3`, and its own test
+replaces yt-dlp's `YoutubeDL`. The suite covers manifest parsing, the filename
 rules and the exit codes rather than the download itself.
