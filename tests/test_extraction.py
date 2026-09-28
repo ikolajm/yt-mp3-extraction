@@ -24,6 +24,8 @@ class TestExtractMp3:
         def fake_download(url: str, output_template: Path) -> None:
             recorded["url"] = url
             recorded["output_template"] = output_template
+            # Leave the file yt-dlp would, so extract_mp3 has one to move.
+            Path(str(output_template).replace("%(ext)s", AUDIO_FORMAT)).touch()
 
         monkeypatch.setattr(extraction, "download_mp3", fake_download)
         return recorded
@@ -36,8 +38,15 @@ class TestExtractMp3:
         assert captured["url"] == ROW.youtube_link
 
         template = captured["output_template"]
-        assert template.parent == output_dir
+        assert template.parent.parent == output_dir
         assert template.name.endswith(".%(ext)s")  # yt-dlp expands this itself
+
+    def test_finished_file_ends_up_in_its_place(
+        self, captured: dict[str, Any], output_dir: Path
+    ) -> None:
+        extraction.extract_mp3(ROW, output_dir)
+
+        assert list(output_dir.iterdir()) == [output_dir / f"Some_Song.{AUDIO_FORMAT}"]
 
     def test_sanitizes_the_name_before_it_reaches_the_seam(
         self, captured: dict[str, Any], output_dir: Path
@@ -47,7 +56,7 @@ class TestExtractMp3:
         )
 
         template = captured["output_template"]
-        assert template.parent == output_dir
+        assert template.parent.parent == output_dir
         assert "escape_attempt" in template.name
         assert ".." not in template.name
 
@@ -88,3 +97,18 @@ class TestExtractMp3:
 
         assert extraction.extract_mp3(ROW, output_dir) is False
         assert "Download failed" in capsys.readouterr().err
+
+    def test_an_interrupted_download_leaves_nothing_behind(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        output_dir: Path,
+    ) -> None:
+        def fake_download(url: str, output_template: Path) -> NoReturn:
+            Path(str(output_template).replace("%(ext)s", AUDIO_FORMAT)).touch()
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(extraction, "download_mp3", fake_download)
+
+        with pytest.raises(KeyboardInterrupt):
+            extraction.extract_mp3(ROW, output_dir)
+        assert list(output_dir.iterdir()) == []
