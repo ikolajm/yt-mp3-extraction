@@ -1,4 +1,3 @@
-import subprocess
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -6,10 +5,10 @@ import pytest
 
 from yt_mp3_extraction import extraction
 from yt_mp3_extraction.config import AUDIO_FORMAT
+from yt_mp3_extraction.fetch import FetchError
 from yt_mp3_extraction.models import RequestRow
 
 ROW = RequestRow("Some Song", "https://youtube.com/watch?v=abc")
-TIMEOUT = 7
 
 
 class TestExtractMp3:
@@ -19,54 +18,38 @@ class TestExtractMp3:
 
     @pytest.fixture
     def captured(self, monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
-        """Record the subprocess call. Stays empty if nothing shells out."""
+        """Record the seam call. Stays empty if nothing is downloaded."""
         recorded: dict[str, Any] = {}
 
-        def fake_run(
-            command: list[str], **kwargs: Any
-        ) -> subprocess.CompletedProcess[str]:
-            recorded["command"] = command
-            recorded["kwargs"] = kwargs
-            return subprocess.CompletedProcess(command, returncode=0)
+        def fake_download(url: str, output_template: Path) -> None:
+            recorded["url"] = url
+            recorded["output_template"] = output_template
 
-        monkeypatch.setattr(subprocess, "run", fake_run)
+        monkeypatch.setattr(extraction, "download_mp3", fake_download)
         return recorded
 
-    def test_builds_the_expected_command(
+    def test_hands_the_link_and_template_to_the_seam(
         self, captured: dict[str, Any], output_dir: Path
     ) -> None:
-        assert extraction.extract_mp3(ROW, output_dir, TIMEOUT) is True
+        assert extraction.extract_mp3(ROW, output_dir) is True
 
-        command = captured["command"]
-        assert command[0] == "yt-dlp"
-        assert "-x" in command
-        assert command[command.index("--audio-format") + 1] == AUDIO_FORMAT
+        assert captured["url"] == ROW.youtube_link
 
-        output = command[command.index("-o") + 1]
-        assert isinstance(output, str)
-        assert output.endswith(".%(ext)s")  # yt-dlp expands this itself
-        assert str(output_dir) in output
+        template = captured["output_template"]
+        assert template.parent == output_dir
+        assert template.name.endswith(".%(ext)s")  # yt-dlp expands this itself
 
-        assert command[-2:] == ["--", ROW.youtube_link]  # `--` guards a leading dash
-
-    def test_passes_the_configured_timeout(
-        self, captured: dict[str, Any], output_dir: Path
-    ) -> None:
-        extraction.extract_mp3(ROW, output_dir, TIMEOUT)
-
-        assert captured["kwargs"]["timeout"] == TIMEOUT
-        assert captured["kwargs"]["check"] is True
-
-    def test_sanitizes_the_name_before_it_reaches_the_command(
+    def test_sanitizes_the_name_before_it_reaches_the_seam(
         self, captured: dict[str, Any], output_dir: Path
     ) -> None:
         extraction.extract_mp3(
-            RequestRow("../../escape attempt", "https://a"), output_dir, TIMEOUT
+            RequestRow("../../escape attempt", "https://a"), output_dir
         )
 
-        output = captured["command"][captured["command"].index("-o") + 1]
-        assert "escape_attempt" in output
-        assert ".." not in output
+        template = captured["output_template"]
+        assert template.parent == output_dir
+        assert "escape_attempt" in template.name
+        assert ".." not in template.name
 
     def test_skips_a_file_that_already_exists(
         self,
@@ -76,9 +59,9 @@ class TestExtractMp3:
     ) -> None:
         (output_dir / f"Some_Song.{AUDIO_FORMAT}").touch()
 
-        assert extraction.extract_mp3(ROW, output_dir, TIMEOUT) is True
+        assert extraction.extract_mp3(ROW, output_dir) is True
         assert "already exists" in capsys.readouterr().out
-        assert "command" not in captured
+        assert "url" not in captured
 
     def test_rejects_a_name_with_nothing_usable_in_it(
         self,
@@ -87,36 +70,21 @@ class TestExtractMp3:
         output_dir: Path,
     ) -> None:
         assert (
-            extraction.extract_mp3(RequestRow("...", "https://a"), output_dir, TIMEOUT)
-            is False
+            extraction.extract_mp3(RequestRow("...", "https://a"), output_dir) is False
         )
         assert "no usable filename" in capsys.readouterr().err
-        assert "command" not in captured
+        assert "url" not in captured
 
-    @pytest.mark.parametrize(
-        "error, expected_fragment",
-        [
-            (subprocess.CalledProcessError(3, "yt-dlp"), "error code 3"),
-            (subprocess.TimeoutExpired("yt-dlp", 180), "Timed out"),
-            (
-                FileNotFoundError(2, "No such file or directory"),
-                "Error running extraction",
-            ),
-        ],
-        ids=["yt-dlp-exited-nonzero", "yt-dlp-hung", "yt-dlp-vanished"],
-    )
     def test_reports_a_failure_without_crashing(
         self,
         capsys: pytest.CaptureFixture[str],
         monkeypatch: pytest.MonkeyPatch,
         output_dir: Path,
-        error: Exception,
-        expected_fragment: str,
     ) -> None:
-        def fake_run(command: list[str], **kwargs: Any) -> NoReturn:
-            raise error
+        def fake_download(url: str, output_template: Path) -> NoReturn:
+            raise FetchError("boom")
 
-        monkeypatch.setattr(subprocess, "run", fake_run)
+        monkeypatch.setattr(extraction, "download_mp3", fake_download)
 
-        assert extraction.extract_mp3(ROW, output_dir, TIMEOUT) is False
-        assert expected_fragment in capsys.readouterr().err
+        assert extraction.extract_mp3(ROW, output_dir) is False
+        assert "Download failed" in capsys.readouterr().err

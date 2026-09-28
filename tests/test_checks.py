@@ -1,10 +1,8 @@
 import shutil
-import subprocess
-from typing import Any, NoReturn
 
 import pytest
 
-from yt_mp3_extraction import check_ffmpeg, check_ytdlp
+from yt_mp3_extraction import check_ffmpeg
 
 
 class TestHasFfmpeg:
@@ -20,61 +18,3 @@ class TestHasFfmpeg:
 
         assert check_ffmpeg.has_ffmpeg() is False
         assert "ffmpeg" in capsys.readouterr().err
-
-
-class TestHasYtdlp:
-    @pytest.fixture
-    def on_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/yt-dlp")
-
-    def test_true_when_the_binary_runs(
-        self, monkeypatch: pytest.MonkeyPatch, on_path: None
-    ) -> None:
-        recorded: dict[str, Any] = {}
-
-        def fake_run(
-            command: list[str], **kwargs: Any
-        ) -> subprocess.CompletedProcess[str]:
-            recorded["command"] = command
-            recorded["kwargs"] = kwargs
-            return subprocess.CompletedProcess(command, 0)
-
-        monkeypatch.setattr(subprocess, "run", fake_run)
-
-        assert check_ytdlp.has_ytdlp() is True
-        assert recorded["command"] == ["yt-dlp", "--version"]
-        # Without check=True a non-zero exit is silent and the error branches
-        # below can never fire.
-        assert recorded["kwargs"]["check"] is True
-
-    def test_false_and_reports_when_absent(
-        self, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(shutil, "which", lambda name: None)
-
-        assert check_ytdlp.has_ytdlp() is False
-        assert "not installed" in capsys.readouterr().err
-
-    @pytest.mark.parametrize(
-        "error, expected_fragment",
-        [
-            (subprocess.CalledProcessError(2, "yt-dlp", stderr="broken"), "exited 2"),
-            (OSError("Exec format error"), "Could not execute"),
-        ],
-        ids=["exits-nonzero", "not-executable"],
-    )
-    def test_false_and_reports_when_it_cannot_run(
-        self,
-        capsys: pytest.CaptureFixture[str],
-        monkeypatch: pytest.MonkeyPatch,
-        on_path: None,
-        error: Exception,
-        expected_fragment: str,
-    ) -> None:
-        def boom(*args: Any, **kwargs: Any) -> NoReturn:
-            raise error
-
-        monkeypatch.setattr(subprocess, "run", boom)
-
-        assert check_ytdlp.has_ytdlp() is False
-        assert expected_fragment in capsys.readouterr().err

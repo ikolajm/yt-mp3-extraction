@@ -20,15 +20,12 @@ class TestMain:
         output_dir = tmp_path / "out"
         downloaded = []
         seen: dict[str, Any] = {}
-        timeout = 7
 
-        def fake_extract(row: RequestRow, out_dir: Path, timeout: int) -> bool:
+        def fake_extract(row: RequestRow, out_dir: Path) -> bool:
             downloaded.append(row)
             seen["out_dir"] = out_dir
-            seen["timeout"] = timeout
             return not row.filename.startswith("FAIL")
 
-        monkeypatch.setattr(main_module, "has_ytdlp", lambda: True)
         monkeypatch.setattr(main_module, "has_ffmpeg", lambda: True)
         monkeypatch.setattr(main_module, "extract_mp3", fake_extract)
 
@@ -39,14 +36,11 @@ class TestMain:
                 str(csv_path),
                 "--out",
                 str(output_dir),
-                "--timeout",
-                str(timeout),
             ],
             "csv": csv_path,
             "output_dir": output_dir,
             "downloaded": downloaded,
             "seen": seen,
-            "timeout": timeout,
         }
 
     def test_happy_path_exits_0(self, wired: dict[str, Any]) -> None:
@@ -55,7 +49,6 @@ class TestMain:
         assert main_module.main(wired["argv"]) == 0
         assert [r.filename for r in wired["downloaded"]] == ["Song One", "Song Two"]
         assert wired["seen"]["out_dir"] == wired["output_dir"]
-        assert wired["seen"]["timeout"] == wired["timeout"]
         assert wired["output_dir"].is_dir()
 
     def test_any_failure_exits_1(
@@ -75,11 +68,10 @@ class TestMain:
         assert main_module.main(wired["argv"]) == 1
         assert not wired["output_dir"].exists()
 
-    @pytest.mark.parametrize("missing_dep", ["has_ytdlp", "has_ffmpeg"])
-    def test_missing_dependency_exits_1_before_reading_anything(
-        self, monkeypatch: pytest.MonkeyPatch, wired: dict[str, Any], missing_dep: str
+    def test_missing_ffmpeg_exits_1_before_reading_anything(
+        self, monkeypatch: pytest.MonkeyPatch, wired: dict[str, Any]
     ) -> None:
-        monkeypatch.setattr(main_module, missing_dep, lambda: False)
+        monkeypatch.setattr(main_module, "has_ffmpeg", lambda: False)
 
         assert main_module.main(wired["argv"]) == 1
         assert wired["downloaded"] == []
