@@ -46,9 +46,11 @@ ytx track
 `ytx track` reads `./requests.csv` from the directory it runs in. Point it
 elsewhere with `--from-file PATH`.
 
-`filename` is a stem, without an extension. Any run of characters outside
-`[\w-]` collapses to a single underscore, and the stem is capped at 240 bytes,
-so a name cannot escape the output directory or overflow a filesystem limit.
+`filename` is a stem, without an extension. Spaces are kept. Characters Windows
+or Linux refuses in a filename (`<>:"/\|?*` and control characters) are removed,
+whitespace collapses to single spaces, trailing dots and spaces are stripped, and
+the stem is capped at 240 bytes, so a name is valid on both systems and cannot
+escape the output directory or overflow a filesystem limit.
 
 A row missing either column is reported and skipped; the run continues. Exit
 status is non-zero if any row failed.

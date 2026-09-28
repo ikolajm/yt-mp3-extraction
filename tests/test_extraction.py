@@ -46,7 +46,7 @@ class TestExtractMp3:
     ) -> None:
         extraction.extract_mp3(ROW, output_dir)
 
-        assert list(output_dir.iterdir()) == [output_dir / f"Some_Song.{AUDIO_FORMAT}"]
+        assert list(output_dir.iterdir()) == [output_dir / f"Some Song.{AUDIO_FORMAT}"]
 
     def test_sanitizes_the_name_before_it_reaches_the_seam(
         self, captured: dict[str, Any], output_dir: Path
@@ -57,8 +57,8 @@ class TestExtractMp3:
 
         template = captured["output_template"]
         assert template.parent.parent == output_dir
-        assert "escape_attempt" in template.name
-        assert ".." not in template.name
+        # The separators are gone; the dots left behind are one harmless name.
+        assert template.name == "....escape attempt.%(ext)s"
 
     def test_skips_a_file_that_already_exists(
         self,
@@ -66,7 +66,7 @@ class TestExtractMp3:
         captured: dict[str, Any],
         output_dir: Path,
     ) -> None:
-        (output_dir / f"Some_Song.{AUDIO_FORMAT}").touch()
+        (output_dir / f"Some Song.{AUDIO_FORMAT}").touch()
 
         assert extraction.extract_mp3(ROW, output_dir) is True
         assert "already exists" in capsys.readouterr().out
