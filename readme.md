@@ -58,6 +58,12 @@ status is non-zero if any row failed.
 Files are written to `~/script-output/`, or to `--out DIR`, created if it does
 not exist.
 
+Each file is downloaded and converted in a temporary folder inside the output
+directory, and moved to its final name only once complete. A failed or
+interrupted download leaves nothing under that name, and the folder is removed.
+A process killed outright gets no chance to clean up and can leave a `tmp...`
+folder behind; delete it.
+
 A link whose output file is already there is skipped without a network call, so
 rerunning after a partial failure only fetches what is missing. Delete a file to
 force a refetch.
