@@ -63,21 +63,38 @@ class TestReadRequests:
             write_csv(HEADER + "  https://a  ,  Song One  ,  Some Band  , , , \n")
         )
 
-        assert rows == [RequestRow("https://a", "Song One", "Some Band")]
+        assert rows == [RequestRow("https://a", "Song One", "Some Band", line=2)]
 
     def test_reads_the_shape_example(self, write_csv: Callable[[str], Path]) -> None:
         rows = read_requests(write_csv(SHAPE_EXAMPLE))
 
         assert rows == [
-            RequestRow("https://youtu.be/AAA", "Song One", "Some Band"),
-            RequestRow("https://youtu.be/BBB", "Opener", "Other Band", "Live EP"),
-            RequestRow("https://youtu.be/CCC", "Closer", "Other Band", "Live EP"),
+            RequestRow("https://youtu.be/AAA", "Song One", "Some Band", line=2),
             RequestRow(
-                "https://youtu.be/DDD", "Bulls on Parade", "RATM", "Evil Empire", 0
+                "https://youtu.be/BBB", "Opener", "Other Band", "Live EP", line=3
             ),
-            RequestRow("https://youtu.be/DDD", "Vietnow", "RATM", "Evil Empire", 232),
             RequestRow(
-                "https://youtu.be/DDD", "Revolver", "RATM", "Evil Empire", 510, 785
+                "https://youtu.be/CCC", "Closer", "Other Band", "Live EP", line=4
+            ),
+            RequestRow(
+                "https://youtu.be/DDD",
+                "Bulls on Parade",
+                "RATM",
+                "Evil Empire",
+                0,
+                line=5,
+            ),
+            RequestRow(
+                "https://youtu.be/DDD", "Vietnow", "RATM", "Evil Empire", 232, line=6
+            ),
+            RequestRow(
+                "https://youtu.be/DDD",
+                "Revolver",
+                "RATM",
+                "Evil Empire",
+                510,
+                785,
+                line=7,
             ),
         ]
 
@@ -88,7 +105,7 @@ class TestReadRequests:
             write_csv("youtube_link,title,artist\nhttps://a,Song One,Some Band\n")
         )
 
-        assert rows == [RequestRow("https://a", "Song One", "Some Band")]
+        assert rows == [RequestRow("https://a", "Song One", "Some Band", line=2)]
 
     def test_a_bad_row_refuses_the_whole_manifest(
         self, write_csv: Callable[[str], Path]
@@ -134,7 +151,9 @@ class TestReadRequests:
         """0 is falsy, so a truthiness check on the parsed start refuses it."""
         rows = read_requests(write_csv(HEADER + "https://a,Song,Band,,0:00,3:52\n"))
 
-        assert rows == [RequestRow("https://a", "Song", "Band", start=0, end=232)]
+        assert rows == [
+            RequestRow("https://a", "Song", "Band", start=0, end=232, line=2)
+        ]
 
     def test_extra_cells_are_refused(self, write_csv: Callable[[str], Path]) -> None:
         """An unquoted comma in a title, which shifts every cell after it."""
@@ -150,6 +169,19 @@ class TestReadRequests:
     ) -> None:
         with pytest.raises(ManifestError, match="No requests found"):
             read_requests(write_csv(HEADER))
+
+    def test_a_row_carries_the_line_it_ends_on(
+        self, write_csv: Callable[[str], Path]
+    ) -> None:
+        rows = read_requests(
+            write_csv(
+                HEADER
+                + 'https://a,"Track A\n",Band A,Album A\n'
+                + "https://b,Track B,Band B,Album B\n"
+            )
+        )
+
+        assert rows[1].line == 4
 
     @pytest.mark.parametrize(
         "header, expected",
@@ -199,4 +231,12 @@ class TestReadRequests:
         path.mkdir()
 
         with pytest.raises(ManifestError, match="Could not read"):
+            read_requests(path)
+
+    def test_a_manifest_that_is_not_utf8_is_reported(self, tmp_path: Path) -> None:
+        """What Excel's plain "CSV" save writes: cp1252, where é is one byte."""
+        path = tmp_path / "requests.csv"
+        path.write_bytes((HEADER + "https://a,Café,Band,,,\n").encode("cp1252"))
+
+        with pytest.raises(ManifestError, match="is not UTF-8"):
             read_requests(path)
