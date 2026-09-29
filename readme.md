@@ -1,6 +1,6 @@
 # yt-mp3-extraction
 
-Downloads the audio from a list of YouTube links and writes one mp3 per link.
+Downloads the audio from a list of YouTube links and writes one mp3 per row.
 Input is a CSV manifest, so the files come out named what you called them rather
 than what the uploader called them.
 
@@ -29,31 +29,43 @@ install.
 ## Usage
 
 Copy `requests.example.csv` to `requests.csv` and fill it in. `requests.csv` is
-gitignored, so your list stays out of the repo. The header is exact; an extra or
-missing column aborts the run before anything downloads.
+gitignored, so your list stays out of the repo.
 
 ```
-filename,youtube_link
-Some Video Title,https://www.youtube.com/watch?v=VIDEO_ID
+youtube_link,title,artist,album,start,end
+https://www.youtube.com/watch?v=VIDEO_ID,Some Song,Some Band,,,
+https://www.youtube.com/watch?v=VIDEO_ID,Opener,Other Band,Live EP,,
 ```
+
+`youtube_link`, `title` and `artist` are required columns; `album`, `start` and
+`end` are optional and can be left out of the header entirely. A missing
+required column, any other column, or a column named twice aborts the run
+before anything downloads.
+
+`album`, `start` and `end` are read and checked but not yet acted on: every row
+downloads its whole video as one file. `start` and `end` are `M:SS` or
+`H:MM:SS`, and `end` needs a `start`.
 
 Then, from the directory holding `requests.csv`:
 
 ```
-ytx track
+ytx get
 ```
 
-`ytx track` reads `./requests.csv` from the directory it runs in. Point it
+`ytx get` reads `./requests.csv` from the directory it runs in. Point it
 elsewhere with `--from-file PATH`.
 
-`filename` is a stem, without an extension. Spaces are kept. Characters Windows
-or Linux refuses in a filename (`<>:"/\|?*` and control characters) are removed,
-whitespace collapses to single spaces, trailing dots and spaces are stripped, and
-the stem is capped at 240 bytes, so a name is valid on both systems and cannot
-escape the output directory or overflow a filesystem limit.
+Every row is checked before anything downloads. A row missing a required value,
+a malformed time, an `end` without a `start` or more cells than the header has
+columns refuses the whole manifest, and every problem is listed by row. Quote a
+value that contains a comma. Exit status is non-zero if the manifest is refused
+or any row failed.
 
-A row missing either column is reported and skipped; the run continues. Exit
-status is non-zero if any row failed.
+Each file is named from its `title`. Spaces are kept. Characters Windows or
+Linux refuses in a filename (`<>:"/\|?*` and control characters) are removed,
+whitespace collapses to single spaces, trailing dots and spaces are stripped,
+and the name is capped at 240 bytes, so it is valid on both systems and cannot
+escape the output directory or overflow a filesystem limit.
 
 ## Output
 
@@ -80,5 +92,5 @@ ruff format --check
 ```
 
 The download is faked: most tests replace `download_mp3`, and its own test
-replaces yt-dlp's `YoutubeDL`. The suite covers manifest parsing, the filename
+replaces yt-dlp's `YoutubeDL`. The suite covers manifest parsing, the naming
 rules and the exit codes rather than the download itself.
