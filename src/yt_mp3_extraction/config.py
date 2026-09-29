@@ -1,3 +1,4 @@
 AUDIO_FORMAT = "mp3"
 
-EXPECTED_COLUMNS = {"filename", "youtube_link"}
+REQUIRED_COLUMNS = {"youtube_link", "title", "artist"}
+OPTIONAL_COLUMNS = {"album", "start", "end"}

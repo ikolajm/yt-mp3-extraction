@@ -8,7 +8,7 @@ from yt_mp3_extraction.config import AUDIO_FORMAT
 from yt_mp3_extraction.fetch import FetchError
 from yt_mp3_extraction.models import RequestRow
 
-ROW = RequestRow("Some Song", "https://youtube.com/watch?v=abc")
+ROW = RequestRow("https://youtube.com/watch?v=abc", "Some Song", "Some Band")
 
 
 class TestExtractMp3:
@@ -52,7 +52,7 @@ class TestExtractMp3:
         self, captured: dict[str, Any], output_dir: Path
     ) -> None:
         extraction.extract_mp3(
-            RequestRow("../../escape attempt", "https://a"), output_dir
+            RequestRow("https://a", "../../escape attempt", "Some Band"), output_dir
         )
 
         template = captured["output_template"]
@@ -78,9 +78,8 @@ class TestExtractMp3:
         captured: dict[str, Any],
         output_dir: Path,
     ) -> None:
-        assert (
-            extraction.extract_mp3(RequestRow("...", "https://a"), output_dir) is False
-        )
+        row = RequestRow("https://a", "...", "Some Band")
+        assert extraction.extract_mp3(row, output_dir) is False
         assert "no usable filename" in capsys.readouterr().err
         assert "url" not in captured
 

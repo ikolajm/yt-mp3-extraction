@@ -4,16 +4,20 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .check_ffmpeg import has_ffmpeg
-from .csv_utilities import read_requests
+from .csv_utilities import ManifestError, read_requests
 from .extraction import extract_mp3
 
 
-def run_track(args: argparse.Namespace) -> int:
+def run_get(args: argparse.Namespace) -> int:
     if not has_ffmpeg():
         return 1
 
-    rows = read_requests(args.from_file)
-    if rows is None:
+    try:
+        rows = read_requests(args.from_file)
+    except ManifestError as err:
+        print(f"Cannot run `{args.from_file}`:", file=sys.stderr)
+        for problem in err.problems:
+            print(f"    {problem}", file=sys.stderr)
         return 1
 
     try:
@@ -40,19 +44,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    track_parser = subparsers.add_parser(
-        "track", help="download each request as a single track"
+    get_parser = subparsers.add_parser(
+        "get", help="download every track the manifest describes"
     )
-    track_parser.set_defaults(func=run_track)
+    get_parser.set_defaults(func=run_get)
 
-    track_parser.add_argument(
+    get_parser.add_argument(
         "--from-file",
         type=Path,
         default=Path("requests.csv"),
         help="CSV manifest of requests (default: ./requests.csv)",
     )
 
-    track_parser.add_argument(
+    get_parser.add_argument(
         "--out",
         type=Path,
         default=Path.home() / "script-output",

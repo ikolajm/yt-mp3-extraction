@@ -14,17 +14,18 @@ def extract_mp3(row: RequestRow, out_dir: Path) -> bool:
     Returns True on success or if the file is already present, False if the
     name is unusable or yt-dlp failed.
     """
-    file_stem = sanitize_filename(row.filename)
+    # Named from the title, flat in out_dir, until planning builds the layout.
+    file_stem = sanitize_filename(row.title)
     if not file_stem:
         print(
-            f"Skipping {row.filename!r}: no usable filename characters.",
+            f"Skipping {row.title!r}: no usable filename characters.",
             file=sys.stderr,
         )
         return False
 
     final_path = out_dir / f"{file_stem}.{AUDIO_FORMAT}"
     if final_path.exists():
-        print(f"Skipping {row.filename!r}: {final_path.name} already exists.")
+        print(f"Skipping {row.title!r}: {final_path.name} already exists.")
         return True
 
     # Download into a staging directory and move the finished file into place,
@@ -45,5 +46,5 @@ def extract_mp3(row: RequestRow, out_dir: Path) -> bool:
             print(f"Download complete: {final_path.name}")
             return True
         except FetchError:
-            print(f"Download failed: {row.filename}", file=sys.stderr)
+            print(f"Download failed: {row.title}", file=sys.stderr)
             return False
