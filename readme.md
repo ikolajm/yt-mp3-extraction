@@ -58,8 +58,9 @@ elsewhere with `--from-file PATH`.
 Every row is checked before anything downloads. A row missing a required value,
 a malformed time, an `end` without a `start` or more cells than the header has
 columns refuses the whole manifest, and every problem is listed by row. Quote a
-value that contains a comma. Exit status is non-zero if the manifest is refused
-or any row failed.
+value that contains a comma. The file must be UTF-8: from Excel, save it as
+"CSV UTF-8", since its plain "CSV" is refused at the first accented character.
+Exit status is non-zero if the manifest is refused or any row failed.
 
 Each file is named from its `title`. Spaces are kept. Characters Windows or
 Linux refuses in a filename (`<>:"/\|?*` and control characters) are removed,

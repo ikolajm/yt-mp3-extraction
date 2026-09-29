@@ -64,7 +64,7 @@ def _header_problems(fieldnames: Sequence[str] | None) -> list[str]:
     return problems
 
 
-def _parse_row(row: Mapping[str | None, Any]) -> RequestRow:
+def _parse_row(row: Mapping[str | None, Any], line: int) -> RequestRow:
     """Build one request from a CSV row.
 
     Raises ManifestError carrying every problem in the row, so one run reports
@@ -108,6 +108,7 @@ def _parse_row(row: Mapping[str | None, Any]) -> RequestRow:
         album=cells["album"] or None,
         start=times["start"],
         end=times["end"],
+        line=line,
     )
 
 
@@ -133,7 +134,7 @@ def read_requests(csv_path: Path) -> list[RequestRow]:
 
             for row in csv_reader:
                 try:
-                    rows.append(_parse_row(row))
+                    rows.append(_parse_row(row, csv_reader.line_num))
                 except ManifestError as err:
                     line = csv_reader.line_num
                     problems.extend(
@@ -144,6 +145,14 @@ def read_requests(csv_path: Path) -> list[RequestRow]:
         raise ManifestError([message]) from err
     except OSError as err:
         raise ManifestError([f"Could not read `{csv_path}`: {err}"]) from err
+    # A ValueError, not an OSError, so the clause above misses it. Excel's plain
+    # "CSV" save is cp1252, which fails here on the first accented character.
+    except UnicodeDecodeError as err:
+        message = (
+            f"`{csv_path}` is not UTF-8 (byte {err.start}). "
+            'Save it as "CSV UTF-8" and rerun.'
+        )
+        raise ManifestError([message]) from err
 
     if problems:
         raise ManifestError(problems)

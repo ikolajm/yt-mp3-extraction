@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass
@@ -9,3 +10,16 @@ class RequestRow:
     album: str | None = None
     start: int | None = None
     end: int | None = None
+    line: int = field(kw_only=True)
+
+
+@dataclass(frozen=True)
+class Track:
+    path: Path
+    title: str
+    artist: str
+    album: str | None
+    track_number: int | None
+    link: str
+    start: int | None
+    end: int | None
