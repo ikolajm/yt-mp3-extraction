@@ -5,7 +5,9 @@ from pathlib import Path
 
 from .check_ffmpeg import has_ffmpeg
 from .csv_utilities import ManifestError, read_requests
-from .extraction import extract_mp3
+from .extraction import extract_link
+from .models import Track
+from .planning import plan_tracks
 
 
 def run_get(args: argparse.Namespace) -> int:
@@ -14,6 +16,7 @@ def run_get(args: argparse.Namespace) -> int:
 
     try:
         rows = read_requests(args.from_file)
+        tracks = plan_tracks(rows, args.out)
     except ManifestError as err:
         print(f"Cannot run `{args.from_file}`:", file=sys.stderr)
         for problem in err.problems:
@@ -26,14 +29,19 @@ def run_get(args: argparse.Namespace) -> int:
         print(f"Could not create directory `{args.out}`: {err}", file=sys.stderr)
         return 1
 
-    failures = 0
-    for row in rows:
-        if not extract_mp3(row, args.out):
-            failures += 1
+    by_link: dict[str, list[Track]] = {}
+    for track in tracks:
+        by_link.setdefault(track.link, []).append(track)
 
-    print(f"Extraction complete: {len(rows) - failures}/{len(rows)} downloaded.")
+    failures = 0
+    for link_tracks in by_link.values():
+        failures += extract_link(link_tracks, args.out)
+
+    print(
+        f"Extraction complete: {len(tracks) - failures}/{len(tracks)} tracks in place."
+    )
     if failures:
-        print(f"{failures} of {len(rows)} rows failed to extract.", file=sys.stderr)
+        print(f"{failures} of {len(tracks)} tracks failed to extract.", file=sys.stderr)
 
     return 1 if failures else 0
 
