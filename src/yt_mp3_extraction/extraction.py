@@ -1,50 +1,74 @@
+import shutil
 import sys
 import tempfile
 from pathlib import Path
 
-from .config import AUDIO_FORMAT
-from .fetch import FetchError, download_mp3
-from .models import RequestRow
-from .naming import sanitize_filename
+from .cutting import CutError, check_times, cut
+from .fetch import FetchError, download_audio, download_mp3
+from .models import Track
 
 
-def extract_mp3(row: RequestRow, out_dir: Path) -> bool:
-    """Download one request's audio into out_dir.
+def _place(staged: Path, final: Path) -> None:
+    """Move a finished file from staging to its final path, making its folders."""
+    final.parent.mkdir(parents=True, exist_ok=True)
+    # replace, not rename: rename refuses an existing target on Windows.
+    staged.replace(final)
 
-    Returns True on success or if the file is already present, False if the
-    name is unusable or yt-dlp failed.
+
+def extract_link(tracks: list[Track], out_dir: Path) -> int:
+    """Fetch one link once and place every one of its tracks not already there.
+
+    Returns how many of the link's tracks failed.
     """
-    # Named from the title, flat in out_dir, until planning builds the layout.
-    file_stem = sanitize_filename(row.title)
-    if not file_stem:
-        print(
-            f"Skipping {row.title!r}: no usable filename characters.",
-            file=sys.stderr,
-        )
-        return False
+    link = tracks[0].link
+    pending: list[Track] = []
 
-    final_path = out_dir / f"{file_stem}.{AUDIO_FORMAT}"
-    if final_path.exists():
-        print(f"Skipping {row.title!r}: {final_path.name} already exists.")
-        return True
+    for t in tracks:
+        if t.path.exists():
+            print(f"Skipping {t.title!r}: {t.path.name} already exists.")
+        else:
+            pending.append(t)
 
-    # Download into a staging directory and move the finished file into place,
-    # so an interrupted conversion never leaves a partial file under the final
-    # name for skip-if-exists to trust. Staging sits inside out_dir so the move
-    # is a rename on one filesystem.
-    with tempfile.TemporaryDirectory(dir=out_dir) as staging:
+    if not pending:
+        return 0
+
+    # Download, convert and cut in a staging directory and move each finished
+    # track into place, so an interrupted run never leaves a partial file under
+    # a final name for skip-if-exists to trust. Staging sits inside out_dir so
+    # the move is a rename on one filesystem. ignore_cleanup_errors: after a
+    # Ctrl+C on Windows, ffmpeg can still hold its output open, and the delete's
+    # PermissionError would replace the KeyboardInterrupt main catches.
+    with tempfile.TemporaryDirectory(
+        dir=out_dir, ignore_cleanup_errors=True
+    ) as staging:
         staging_dir = Path(staging)
-
-        # yt-dlp fills in %(ext)s itself; the extension changes between
-        # download and audio extraction.
-        output_template = staging_dir / f"{file_stem}.%(ext)s"
+        placed = 0
 
         try:
-            download_mp3(row.youtube_link, output_template)
-            # replace, not rename: rename refuses an existing target on Windows.
-            (staging_dir / final_path.name).replace(final_path)
-            print(f"Download complete: {final_path.name}")
-            return True
-        except FetchError:
-            print(f"Download failed: {row.title}", file=sys.stderr)
-            return False
+            if pending[0].start is None:
+                download_mp3(link, staging_dir / "source.%(ext)s")
+                mp3_out = staging_dir / "source.mp3"
+                for i, track in enumerate(pending):
+                    # Copy, never move: the next track copies from mp3_out too.
+                    staged = staging_dir / f"{i}.mp3"
+                    shutil.copyfile(mp3_out, staged)
+                    _place(staged, track.path)
+                    placed += 1
+            else:
+                source = download_audio(link, staging_dir)
+                problems = check_times(tracks, source.duration)
+
+                if problems:
+                    for problem in problems:
+                        print(problem, file=sys.stderr)
+                    return len(pending)
+
+                for i, track in enumerate(pending):
+                    staged = staging_dir / f"{i}.mp3"
+                    assert track.start is not None
+                    cut(source.path, track.start, track.end, staged)
+                    _place(staged, track.path)
+                    placed += 1
+        except (FetchError, CutError) as err:
+            print(f"{link}: {err}", file=sys.stderr)
+        return len(pending) - placed

@@ -4,9 +4,10 @@ from typing import Any
 import pytest
 
 from yt_mp3_extraction import main as main_module
-from yt_mp3_extraction.models import RequestRow
+from yt_mp3_extraction.models import Track
 
 HEADER = "youtube_link,title,artist\n"
+ALBUM_HEADER = "youtube_link,title,artist,album\n"
 
 
 class TestMain:
@@ -14,20 +15,20 @@ class TestMain:
     def wired(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, Any]:
         """Sandbox main(): deps present, paths in tmp_path, no downloads.
 
-        The fake fails any row named FAIL*.
+        The fake fails any track named FAIL*.
         """
         csv_path = tmp_path / "requests.csv"
         output_dir = tmp_path / "out"
-        downloaded = []
+        downloaded: list[list[Track]] = []
         seen: dict[str, Any] = {}
 
-        def fake_extract(row: RequestRow, out_dir: Path) -> bool:
-            downloaded.append(row)
+        def fake_extract_link(tracks: list[Track], out_dir: Path) -> int:
+            downloaded.append(tracks)
             seen["out_dir"] = out_dir
-            return not row.title.startswith("FAIL")
+            return sum(1 for t in tracks if t.title.startswith("FAIL"))
 
         monkeypatch.setattr(main_module, "has_ffmpeg", lambda: True)
-        monkeypatch.setattr(main_module, "extract_mp3", fake_extract)
+        monkeypatch.setattr(main_module, "extract_link", fake_extract_link)
 
         return {
             "argv": [
@@ -49,7 +50,11 @@ class TestMain:
         )
 
         assert main_module.main(wired["argv"]) == 0
-        assert [r.title for r in wired["downloaded"]] == ["Song One", "Song Two"]
+        # One call per link, each holding that link's tracks.
+        assert [[t.title for t in call] for call in wired["downloaded"]] == [
+            ["Song One"],
+            ["Song Two"],
+        ]
         assert wired["seen"]["out_dir"] == wired["output_dir"]
         assert wired["output_dir"].is_dir()
 
@@ -61,7 +66,38 @@ class TestMain:
         )
 
         assert main_module.main(wired["argv"]) == 1
-        assert "1/2 downloaded" in capsys.readouterr().out
+        assert "1/2 tracks in place" in capsys.readouterr().out
+
+    def test_rows_sharing_a_link_reach_extraction_together(
+        self, wired: dict[str, Any]
+    ) -> None:
+        # A single that is also on an album: one link, two tracks, one call.
+        wired["csv"].write_text(
+            ALBUM_HEADER
+            + "https://a,Song One,Some Band,\n"
+            + "https://a,Song One,Some Band,Live EP\n"
+        )
+
+        assert main_module.main(wired["argv"]) == 0
+        assert len(wired["downloaded"]) == 1
+        assert len(wired["downloaded"][0]) == 2
+
+    def test_a_plan_refusal_is_reported_and_creates_nothing(
+        self, capsys: pytest.CaptureFixture[str], wired: dict[str, Any]
+    ) -> None:
+        """Ordering: plan before creating anything on disk."""
+        # Each row reads fine; the planner refuses album X split by a single.
+        wired["csv"].write_text(
+            ALBUM_HEADER
+            + "https://a,One,Band,X\n"
+            + "https://b,Two,Band,\n"
+            + "https://c,Three,Band,X\n"
+        )
+
+        assert main_module.main(wired["argv"]) == 1
+        assert not wired["output_dir"].exists()
+        assert wired["downloaded"] == []
+        assert "keep an album's rows together" in capsys.readouterr().err
 
     def test_bad_csv_is_reported_and_creates_nothing(
         self, capsys: pytest.CaptureFixture[str], wired: dict[str, Any]
