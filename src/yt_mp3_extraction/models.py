@@ -23,3 +23,9 @@ class Track:
     link: str
     start: int | None
     end: int | None
+
+
+@dataclass(frozen=True)
+class Source:
+    path: Path
+    duration: float
