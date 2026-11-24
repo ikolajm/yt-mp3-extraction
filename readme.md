@@ -18,15 +18,11 @@ with this one, along with deno, the JavaScript runtime it uses for YouTube.
 
 ## Install
 
+In a Python environment of your choice:
+
 ```
-python3 -m venv .venv
-source .venv/bin/activate
 python -m pip install -e ".[dev]"
 ```
-
-On Windows the activate script is `.venv\Scripts\activate`, and that venv has
-no `python3.exe` — use `python` there, or `python3` falls through to the system
-install.
 
 ## Usage
 
